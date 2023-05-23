@@ -1,81 +1,102 @@
 #include <iostream>
 #include <vector>
-#include <queue>
-#include <climits>
-using namespace std;
+#include <algorithm>
 
-typedef pair<int, int> pii;
-typedef vector<vector<pii>> Graph;
+struct Edge {
+    int src, dest, weight;
+};
 
-vector<int> primMST(const Graph& graph, int startNode) {
-    int numNodes = graph.size();
-    vector<int> parent(numNodes, -1);
-    vector<int> key(numNodes, INT_MAX);
-    vector<bool> visited(numNodes, false);
+struct Subset {
+    int parent, rank;
+};
 
-    priority_queue<pii, vector<pii>, greater<pii>> pq;
-
-    key[startNode] = 0;
-    pq.push({0, startNode});
-
-    while (!pq.empty()) {
-        int currentNode = pq.top().second;
-        int currentWeight = pq.top().first;
-        pq.pop();
-
-        visited[currentNode] = true;
-
-        for (const auto& edge : graph[currentNode]) {
-            int neighborNode = edge.first;
-            int neighborWeight = edge.second;
-
-            if (!visited[neighborNode] && neighborWeight < key[neighborNode]) {
-                parent[neighborNode] = currentNode;
-                key[neighborNode] = neighborWeight;
-                pq.push({key[neighborNode], neighborNode});
-            }
-        }
-    }
-
-    return parent;
+int findParent(std::vector<Subset>& subsets, int i) {
+    if (subsets[i].parent != i)
+        subsets[i].parent = findParent(subsets, subsets[i].parent);
+    return subsets[i].parent;
 }
 
-void printMST(const vector<int>& parent, const Graph& graph) {
-    int numNodes = parent.size();
-    cout << "Edges in the Minimum Spanning Tree:" << endl;
-    for (int i = 1; i < numNodes; ++i) {
-        int u = parent[i];
-        int v = i;
-        int weight = 0;
-        for (const auto& edge : graph[u]) {
-            if (edge.first == v) {
-                weight = edge.second;
-                break;
+void unionSubsets(std::vector<Subset>& subsets, int x, int y) {
+    int xroot = findParent(subsets, x);
+    int yroot = findParent(subsets, y);
+
+    if (subsets[xroot].rank < subsets[yroot].rank)
+        subsets[xroot].parent = yroot;
+    else if (subsets[xroot].rank > subsets[yroot].rank)
+        subsets[yroot].parent = xroot;
+    else {
+        subsets[yroot].parent = xroot;
+        subsets[xroot].rank++;
+    }
+}
+
+bool compareEdges(const Edge& a, const Edge& b) {
+    return a.weight < b.weight;
+}
+
+std::vector<Edge> findMST(std::vector<std::vector<int>>& graph, int numVertices) {
+    std::vector<Edge> result;
+
+    std::vector<Edge> edges;
+    for (int i = 0; i < numVertices; i++) {
+        for (int j = i + 1; j < numVertices; j++) {
+            if (graph[i][j] != 0) {
+                edges.push_back({i, j, graph[i][j]});
             }
         }
-        cout << u << " - " << v << " : " << weight << endl;
     }
+    std::sort(edges.begin(), edges.end(), compareEdges);
+
+    std::vector<Subset> subsets(numVertices);
+    for (int i = 0; i < numVertices; i++) {
+        subsets[i].parent = i;
+        subsets[i].rank = 0;
+    }
+
+    int edgeIndex = 0;
+    int numEdges = 0;
+    while (numEdges < numVertices - 1 && edgeIndex < edges.size()) {
+        Edge nextEdge = edges[edgeIndex++];
+
+        int x = findParent(subsets, nextEdge.src);
+        int y = findParent(subsets, nextEdge.dest);
+
+        if (x != y) {
+            result.push_back(nextEdge);
+            unionSubsets(subsets, x, y);
+            numEdges++;
+        }
+    }
+
+    return result;
+}
+
+void printMST(const std::vector<Edge>& mst) {
+    int totalWeight = 0;
+
+    std::cout << "Minimum Spanning Tree (MST):\n";
+    for (const Edge& edge : mst) {
+        std::cout << edge.src << " - " << edge.dest << " : " << edge.weight << "\n";
+        totalWeight += edge.weight;
+    }
+
+    std::cout << "Total weight: " << totalWeight << "\n";
 }
 
 int main() {
-    int numNodes = 6;
-    Graph graph(numNodes);
+    std::vector<std::vector<int>> graph = {
+        {0, 3, 0, 0, 0, 1},
+        {3, 0, 2, 1, 10, 0},
+        {0, 2, 0, 3, 0, 5},
+        {0, 1, 3, 0, 5, 0},
+        {0, 10, 0, 5, 0, 4},
+        {1, 0, 5, 0, 4, 0}
+    };
 
-    graph[0].push_back({1, 3});
-    graph[1].push_back({0, 3});
-    graph[1].push_back({2, 2});
-    graph[1].push_back({3, 1});
-    graph[2].push_back({1, 2});
-    graph[2].push_back({5, 5});
-    graph[3].push_back({1, 1});
-    graph[4].push_back({5, 4});
-    graph[5].push_back({2, 5});
-    graph[5].push_back({4, 4});
+    int numVertices = graph.size();
 
-    int startNode = 0;
-
-    vector<int> parent = primMST(graph, startNode);
-    printMST(parent, graph);
+    std::vector<Edge> mst = findMST(graph, numVertices);
+    printMST(mst);
 
     return 0;
 }
